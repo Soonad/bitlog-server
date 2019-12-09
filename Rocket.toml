@@ -1,0 +1,2 @@
+[global.databases]
+redis_db = { url = "redis://localhost:6379" }
