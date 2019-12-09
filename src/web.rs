@@ -2,24 +2,37 @@ use rocket_contrib::json::Json;
 use serde::Serialize;
 use super::{db, model, serde_fixed, decode_fixed};
 
+#[derive(Debug)]
+pub enum Error {
+  DbError
+}
+
 #[get("/streams/<w_stream_id>/messages?<offset>&<limit>")]
-pub fn get_messages(conn: db::RocketConn, w_stream_id: WrappedStreamId, offset: Option<u32>, limit: Option<u8>) -> Json<GetMessagesResponse> {
+pub fn get_messages(
+  conn: db::RocketConn,
+  w_stream_id: WrappedStreamId,
+  offset: Option<u32>,
+  limit: Option<u8>
+) -> Result<Json<GetMessagesResponse>, Error> {
   let offset: u32 = offset.unwrap_or(0);
   let limit: u8 = limit.unwrap_or(100);
   let stream_id = w_stream_id.value;
 
   // TODO: 500 instead of panic
-  let messages = db::get_messages(&*conn, &stream_id, offset, limit).unwrap();
+  let messages = db::get_messages(&*conn, &stream_id, offset, limit).map_err(|_| Error::DbError)?;
 
-  Json(GetMessagesResponse { id: stream_id, messages } )
+  Ok(Json(GetMessagesResponse { id: stream_id, messages } ))
 }
 
 #[post("/streams/<w_stream_id>/messages", data="<message>")]
-pub fn create_message(conn: db::RocketConn, w_stream_id: WrappedStreamId, message: Json<model::Message>) -> () {
+pub fn create_message(
+  conn: db::RocketConn,
+  w_stream_id: WrappedStreamId,
+  message: Json<model::Message>
+) -> Result<(), Error> {
   let stream_id = w_stream_id.value;
 
-  // TODO: 500 instead of panic
-  db::add_message(&*conn, &stream_id, message.into_inner()).unwrap();
+  db::add_message(&*conn, &stream_id, message.into_inner()).map_err(|_| Error::DbError)
 }
 
 pub struct WrappedStreamId {
