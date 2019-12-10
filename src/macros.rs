@@ -17,7 +17,7 @@ macro_rules! decode_fixed {
 
 #[macro_export]
 macro_rules! serde_fixed {
-    ($name:ident, $size:expr) => {
+    ($name:ident, $schema:tt, $size:expr) => {
         enum $name {}
         impl $name {
             #[allow(dead_code)]
@@ -45,6 +45,37 @@ macro_rules! serde_fixed {
                 }
 
                 deserializer.deserialize_str(Base64Visitor)
+            }
+        }
+
+        impl rocket_okapi::JsonSchema for $name {
+            fn schema_name() -> String {
+                String::from($schema)
+            }
+
+            fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+                // This calculates the lenghts for base64 encoded strings
+                // where minimum length is without padding and maximum is with padding.
+                // We accept both padded and unpadded base 64
+                let min_length = (($size as f32)*4.0/3.0).ceil() as u32;
+                let max_length = ((($size as f32)/3.0).ceil()*4.0) as u32;
+
+                // This is just the regex for padded base64url encoded strings with optional padding
+                let pattern = format!("^[A-Za-z0-9_\\-]{{{}}}={{0,{}}}$", min_length, max_length-min_length);
+
+                let mut schema = schemars::schema_for!(String).schema;
+                schema.metadata = None;
+                schema.format = Some(String::from("base64url"));
+                schema.string = Some(
+                    Box::new(
+                        schemars::schema::StringValidation{
+                            max_length: Some(min_length),
+                            min_length: Some(min_length),
+                            pattern: Some(pattern)
+                        }
+                    )
+                );
+                schemars::schema::Schema::Object(schema)
             }
         }
     }
