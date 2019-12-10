@@ -1,0 +1,22 @@
+container:
+  image: rustlang/rust:nightly-buster-slim
+
+test_task:
+  cargo_cache:
+    folder: $CARGO_HOME/registry
+    fingerprint_script: cat Cargo.lock
+  build_script: cargo build
+  test_script: cargo test
+  before_cache_script: rm -rf $CARGO_HOME/registry/index
+
+docker_builder:
+  name: Docker
+  only_if: $CIRRUS_REPO_OWNER == 'moonad' && $CIRRUS_BRANCH == 'master'
+  depends_on:
+    - check
+  env:
+    DOCKER_PASSWORD: placeholder
+    DOCKER_USERNAME: placeholder
+  build_script: docker build --tag moonad/bitlog-server:latest .
+  login_script: docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD
+  push_script: docker push moonad/bitlog-server:latest
