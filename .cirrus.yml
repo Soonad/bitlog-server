@@ -13,10 +13,10 @@ docker_builder:
   name: Docker
   only_if: $CIRRUS_REPO_OWNER == 'moonad' && $CIRRUS_BRANCH == 'master'
   depends_on:
-    - check
+    - test
   env:
-    DOCKER_PASSWORD: placeholder
-    DOCKER_USERNAME: placeholder
+    DOCKER_PASSWORD: ENCRYPTED[52023bdd085200e6b5f63d38603f986286071d67fd086911a5095acfb97f059d351f712151cd8960cd4194166eb7d8e5]
+    DOCKER_USERNAME: ENCRYPTED[cf10ba5722574346a40f76f93d9cfbe2859af429d3daf425077565ef885b41dfbd55b1274b6ef11667d555538480c016]
   build_script: docker build --tag moonad/bitlog-server:latest .
   login_script: docker login --username $DOCKER_USERNAME --password $DOCKER_PASSWORD
   push_script: docker push moonad/bitlog-server:latest
