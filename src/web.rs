@@ -1,28 +1,49 @@
-use super::{db, decode_fixed, model, serde_fixed};
+use super::{db, model, fixed_size_byte_array};
 use rocket_contrib::json::Json;
 use schemars::JsonSchema;
 use serde::Serialize;
+use serde::Deserialize;
 
 #[derive(Debug)]
 pub enum Error {
     DbError,
 }
 
+fixed_size_byte_array!(StreamId, "StreamId", 8);
+fixed_size_byte_array!(MessageSignature, "MessageSignature", 64);
+fixed_size_byte_array!(MessageData, "MessageData", 128);
+
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct Message {
+    signature: MessageSignature,
+    data: MessageData
+}
+
+#[derive(Serialize, JsonSchema)]
+pub struct GetMessagesResponse {
+    id: StreamId,
+    messages: Vec<Message>,
+}
+
 #[openapi]
 #[get("/streams/<stream_id>/messages?<offset>&<limit>")]
 pub fn get_messages(
     conn: db::RocketConn,
-    stream_id: WrappedStreamId,
+    stream_id: StreamId,
     offset: Option<u32>,
     limit: Option<u8>,
 ) -> Result<Json<GetMessagesResponse>, Error> {
     let offset: u32 = offset.unwrap_or(0);
     let limit: u8 = limit.unwrap_or(100);
-    let stream_id = stream_id.value;
-
-    // TODO: 500 instead of panic
+    let m_stream_id = stream_id.as_array();
+    
     let messages =
-        db::get_messages(&*conn, &stream_id, offset, limit).map_err(|_| Error::DbError)?;
+        db::get_messages(&*conn, m_stream_id, offset, limit).map_err(|_| Error::DbError)?;
+        
+    let messages: Vec<Message> = messages.iter().map(|message| Message {
+        data: MessageData::from(message.data),
+        signature: MessageSignature::from(message.signature)
+    }).collect();
 
     Ok(Json(GetMessagesResponse {
         id: stream_id,
@@ -34,60 +55,15 @@ pub fn get_messages(
 #[post("/streams/<stream_id>/messages", data = "<message>")]
 pub fn create_message(
     conn: db::RocketConn,
-    stream_id: WrappedStreamId,
-    message: Json<model::Message>,
+    stream_id: StreamId,
+    message: Json<Message>,
 ) -> Result<(), Error> {
-    let stream_id = stream_id.value;
+        let message = message.into_inner();
+        let m_stream_id = stream_id.as_array();
+        let m_message = model::Message {
+            data: *message.data.as_array(),
+            signature: *message.signature.as_array()
+        };
 
-    db::add_message(&*conn, &stream_id, message.into_inner()).map_err(|_| Error::DbError)
-}
-
-pub struct WrappedStreamId {
-    value: model::StreamId,
-}
-
-impl<'r> rocket::request::FromParam<'r> for WrappedStreamId {
-    type Error = ();
-
-    fn from_param(param: &'r rocket::http::RawStr) -> Result<Self, Self::Error> {
-        decode_fixed!(param.url_decode_lossy().as_str(), 8)
-            .map(|value| WrappedStreamId { value })
-            .map_err(|_| ())
-    }
-}
-
-impl<'r> rocket_okapi::request::OpenApiFromParam<'r> for WrappedStreamId {
-    fn path_parameter(
-        _gen: &mut rocket_okapi::gen::OpenApiGenerator,
-        name: String,
-    ) -> Result<okapi::openapi3::Parameter, rocket_okapi::OpenApiError> {
-        Ok(okapi::openapi3::Parameter {
-            name,
-            location: String::from("path"),
-            description: None,
-            required: true,
-            deprecated: false,
-            allow_empty_value: false,
-            extensions: std::collections::BTreeMap::new(),
-            value: okapi::openapi3::ParameterValue::Schema {
-                style: None,
-                explode: None,
-                allow_reserved: false,
-                schema: schemars::schema::SchemaObject::new_ref(String::from(
-                    "#/components/schemas/Bytes8Base64Encoded",
-                )),
-                example: None,
-                examples: None,
-            },
-        })
-    }
-}
-
-serde_fixed!(SerdeArray8Base64, "Bytes8Base64Encoded", 8);
-
-#[derive(Serialize, JsonSchema)]
-pub struct GetMessagesResponse {
-    #[serde(with = "SerdeArray8Base64")]
-    id: model::StreamId,
-    messages: Vec<model::Message>,
+        db::add_message(&*conn, m_stream_id, m_message).map_err(|_| Error::DbError)
 }

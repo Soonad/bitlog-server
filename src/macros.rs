@@ -1,51 +1,97 @@
 #[macro_export]
-macro_rules! decode_fixed {
-    ($string:expr, $size:expr) => {
-        match base64::decode_config($string, base64::URL_SAFE) {
-            Ok(bytes_vec) => {
+macro_rules! fixed_size_byte_array {
+    ($name:ident, $schema:expr, $size:expr) => {
+        pub struct $name([u8; $size]);
+
+        impl $name {
+            fn as_slice(&self) -> &[u8] {
+                &self.0
+            }
+            fn as_array(&self) -> &[u8; $size] {
+                &self.0
+            }
+        }
+
+        impl std::convert::Into<[u8; $size]> for $name {
+            fn into(self) -> [u8; $size] { *self.as_array() }
+        }
+
+        impl std::convert::From<[u8; $size]> for $name {
+            fn from(bytes: [u8; $size]) -> Self { Self(bytes) }
+        }
+
+        impl std::convert::TryFrom<Vec<u8>> for $name {
+            type Error = &'static str;
+            fn try_from(bytes_vec: Vec<u8>) -> Result<Self, Self::Error> { 
                 if bytes_vec.len() == $size {
                     let mut bytes: [u8; $size] = [0; $size];
                     bytes.copy_from_slice(bytes_vec.as_slice());
-                    Ok(bytes)
+                    Ok(Self(bytes))
                 } else {
                     Err("Invalid byte size")
                 }
-            }
-            _ => Err("Invalid base64"),
+             }
         }
-    };
-}
+        
+        impl<'r> rocket::request::FromParam<'r> for $name {
+            type Error = ();
+        
+            fn from_param(param: &'r rocket::http::RawStr) -> Result<Self, Self::Error> {
+                match base64::decode_config(param.url_decode_lossy().as_str(), base64::URL_SAFE) {
+                    Ok(bytes_vec) => { std::convert::TryFrom::try_from(bytes_vec).map_err(|_| ()) }
+                    _ => Err(())
+                }
+            }
+        }
+        
+        impl<'r> rocket_okapi::request::OpenApiFromParam<'r> for $name {
+            fn path_parameter(
+                _gen: &mut rocket_okapi::gen::OpenApiGenerator,
+                name: String,
+            ) -> Result<okapi::openapi3::Parameter, rocket_okapi::OpenApiError> {
+                Ok(okapi::openapi3::Parameter {
+                    name,
+                    location: String::from("path"),
+                    description: None,
+                    required: true,
+                    deprecated: false,
+                    allow_empty_value: false,
+                    extensions: std::collections::BTreeMap::new(),
+                    value: okapi::openapi3::ParameterValue::Schema {
+                        style: None,
+                        explode: None,
+                        allow_reserved: false,
+                        schema: schemars::schema::SchemaObject::new_ref(String::from(
+                            format!("#/components/schemas/{}", $schema),
+                        )),
+                        example: None,
+                        examples: None,
+                    },
+                })
+            }
+        }
 
-#[macro_export]
-macro_rules! serde_fixed {
-    ($name:ident, $schema:tt, $size:expr) => {
-        enum $name {}
-        impl $name {
-            #[allow(dead_code)]
-            pub fn serialize<S>(bytes: &[u8; $size], serializer: S) -> Result<S::Ok, S::Error>
+        impl serde::ser::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
             where
                 S: serde::ser::Serializer,
             {
                 serializer
-                    .serialize_str(base64::encode_config(&bytes[..], base64::URL_SAFE).as_str())
+                    .serialize_str(base64::encode_config(self.as_slice(), base64::URL_SAFE).as_str())
             }
+        }
 
-            #[allow(dead_code)]
-            pub fn deserialize<'de, D>(
-                deserializer: D,
-            ) -> ::std::result::Result<[u8; $size], D::Error>
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<$name, D::Error>
             where
                 D: serde::de::Deserializer<'de>,
             {
                 struct Base64Visitor;
 
                 impl<'de> serde::de::Visitor<'de> for Base64Visitor {
-                    type Value = [u8; $size];
+                    type Value = $name;
 
-                    fn expecting(
-                        &self,
-                        formatter: &mut ::std::fmt::Formatter,
-                    ) -> ::std::fmt::Result {
+                    fn expecting( &self,formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                         write!(formatter, "base64 ASCII text")
                     }
 
@@ -53,7 +99,8 @@ macro_rules! serde_fixed {
                     where
                         E: serde::de::Error,
                     {
-                        super::decode_fixed!(v, $size).map_err(serde::de::Error::custom)
+                        let bytes_vec = base64::decode_config(v, base64::URL_SAFE).map_err(serde::de::Error::custom)?;
+                        std::convert::TryFrom::try_from(bytes_vec).map_err(serde::de::Error::custom)
                     }
                 }
 
@@ -91,5 +138,5 @@ macro_rules! serde_fixed {
                 schemars::schema::Schema::Object(schema)
             }
         }
-    };
+    }
 }
