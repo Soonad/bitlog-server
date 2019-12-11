@@ -57,3 +57,27 @@ impl ToRedisArgs for Message {
         out.push(bytes.to_vec());
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_message_parsing_and_reading() {
+        let message = Message {
+            data: [1; 128],
+            signature: [2; 64]
+        };
+        let mut args = vec![];
+        Message::write_redis_args(&message, &mut args);
+        assert_eq!(args.len(), 1);
+
+        let value = Value::Data(args[0].clone());
+        let decoded_message = Message::from_redis_value(&value).unwrap();
+
+        assert!(decoded_message.data.iter().eq(message.data.iter()));
+        assert!(decoded_message.signature.iter().eq(message.signature.iter()));
+    }
+
+    // TODO: Add test for the actual connection.
+}
