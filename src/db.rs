@@ -66,7 +66,7 @@ mod test {
     fn test_message_parsing_and_reading() {
         let message = Message {
             data: [1; 128],
-            signature: [2; 64]
+            signature: [2; 64],
         };
         let mut args = vec![];
         Message::write_redis_args(&message, &mut args);
@@ -76,7 +76,10 @@ mod test {
         let decoded_message = Message::from_redis_value(&value).unwrap();
 
         assert!(decoded_message.data.iter().eq(message.data.iter()));
-        assert!(decoded_message.signature.iter().eq(message.signature.iter()));
+        assert!(decoded_message
+            .signature
+            .iter()
+            .eq(message.signature.iter()));
     }
 
     // TODO: Add test for the actual connection.

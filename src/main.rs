@@ -10,9 +10,11 @@ extern crate rocket_okapi;
 mod db;
 mod macros;
 mod model;
+#[cfg(test)]
+mod test;
 mod web;
 
-fn main() {
+fn rocket() -> rocket::Rocket {
     let cors_options: rocket_cors::CorsOptions = rocket_cors::CorsOptions::default();
     let cors = cors_options.to_cors().expect("Cors");
 
@@ -23,5 +25,8 @@ fn main() {
         )
         .attach(db::RocketConn::fairing())
         .attach(cors)
-        .launch();
+}
+
+fn main() {
+    rocket().launch();
 }
