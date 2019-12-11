@@ -1,12 +1,14 @@
 container:
-  image: rustlang/rust:nightly-buster-slim
-
+  dockerfile: ci/Dockerfile
+ 
 test_task:
+  env:
+    COVERALLS_REPO_TOKEN: ENCRYPTED[7be54a8ef5fad54efdf6225353b8e584c48a9c3143df4af637e2da6573cc3450cffa2ed68d4db5fdb8ca7e4973390a54]
   cargo_cache:
     folder: $CARGO_HOME/registry
     fingerprint_script: cat Cargo.lock
   build_script: cargo build
-  test_script: cargo test
+  test_script: cargo tarpaulin --coveralls $CIRRUS_BUILD_ID
   before_cache_script: rm -rf $CARGO_HOME/registry/index
 
 docker_builder:
