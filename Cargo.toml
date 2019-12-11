@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 rocket = "0.4.2"
-base64 = "0.2.1"
+base64 = "0.11.0"
 redis = "0.9.0"
 rocket_okapi = "0.3.0"
 okapi = "0.3.0"

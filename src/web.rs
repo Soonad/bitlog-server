@@ -74,7 +74,7 @@ impl<'r> rocket_okapi::request::OpenApiFromParam<'r> for WrappedStreamId {
                 explode: None,
                 allow_reserved: false,
                 schema: schemars::schema::SchemaObject::new_ref(String::from(
-                    "#/components/schemas/8BytesBase64Encoded",
+                    "#/components/schemas/Bytes8Base64Encoded",
                 )),
                 example: None,
                 examples: None,
@@ -83,7 +83,7 @@ impl<'r> rocket_okapi::request::OpenApiFromParam<'r> for WrappedStreamId {
     }
 }
 
-serde_fixed!(SerdeArray8Base64, "8BytesBase64Encoded", 8);
+serde_fixed!(SerdeArray8Base64, "Bytes8Base64Encoded", 8);
 
 #[derive(Serialize, JsonSchema)]
 pub struct GetMessagesResponse {

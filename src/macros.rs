@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! decode_fixed {
     ($string:expr, $size:expr) => {
-        match base64::decode_mode($string, base64::Base64Mode::UrlSafe) {
+        match base64::decode_config($string, base64::URL_SAFE) {
             Ok(bytes_vec) => {
                 if bytes_vec.len() == $size {
                     let mut bytes: [u8; $size] = [0; $size];
@@ -27,7 +27,7 @@ macro_rules! serde_fixed {
                 S: serde::ser::Serializer,
             {
                 serializer
-                    .serialize_str(base64::encode_mode(bytes, base64::Base64Mode::UrlSafe).as_str())
+                    .serialize_str(base64::encode_config(&bytes[..], base64::URL_SAFE).as_str())
             }
 
             #[allow(dead_code)]
@@ -84,7 +84,7 @@ macro_rules! serde_fixed {
                 schema.metadata = None;
                 schema.format = Some(String::from("base64url"));
                 schema.string = Some(Box::new(schemars::schema::StringValidation {
-                    max_length: Some(min_length),
+                    max_length: Some(max_length),
                     min_length: Some(min_length),
                     pattern: Some(pattern),
                 }));
