@@ -161,6 +161,20 @@ fn validates_message_data() {
     assert_eq!(response.headers().get_one("Content-Type"), Some("application/json"));
 }
 
+#[test]
+fn validates_message_structure() {
+    let client = setup_client();
+
+    let response = client
+        .post("/streams/AAAAAAAAAAM=/messages")
+        .body(String::from("[]"))
+        .header(rocket::http::ContentType::JSON)
+        .dispatch();
+
+    assert_eq!(response.status(), Status::UnprocessableEntity);
+    assert_eq!(response.headers().get_one("Content-Type"), Some("application/json"));
+}
+
 fn encode64(bytes: &[u8]) -> String {
     base64::encode_config(bytes, base64::URL_SAFE)
 }
