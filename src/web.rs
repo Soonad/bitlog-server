@@ -70,3 +70,59 @@ pub fn create_message(
 
     db::add_message(&*conn, m_stream_id, m_message).map_err(|_| Error::DbError)
 }
+
+// RFC 7807 Error Message
+#[derive(Serialize, JsonSchema)]
+pub struct ErrorResponse {
+    _type: &'static str,
+    title: &'static str,
+    status: u16,
+    detail: &'static str
+}
+
+#[catch(404)]
+pub fn not_found(_req: &rocket::Request) -> Json<ErrorResponse> {
+    Json(ErrorResponse {
+        _type: "urn:bitlog:errors:not_found",
+        title: "Resource Not Found",
+        status: 404,
+        detail: concat!(
+            "The requested URL and method combination is not a valid one.",
+            "Please refer to the OAS Spec on https://bitlog.fm/openapi.json"
+        )
+    })
+}
+
+#[catch(422)]
+pub fn unprocessable_entity(_req: &rocket::Request) -> Json<ErrorResponse> {
+    Json(ErrorResponse {
+        _type: "urn:bitlog:errors:unprocessable_entity",
+        title: "Unprocessable Entity",
+        status: 422,
+        detail: concat!(
+            "The request was well formed but the content one or more fields is incorrect.",
+            "Please refer to the OAS Spec on https://bitlog.fm/openapi.json"
+        )
+    })
+}
+
+#[catch(500)]
+pub fn server_error(_req: &rocket::Request) -> Json<ErrorResponse> {
+    Json(ErrorResponse {
+        _type: "urn:bitlog:errors:internal_server_error",
+        title: "Internal Server Error",
+        status: 500,
+        detail: "Something unexpected happened. This is our fault. We are sorry about that. Please try again later"
+    })
+}
+
+pub fn rocket() -> rocket::Rocket {
+    let cors_options: rocket_cors::CorsOptions = rocket_cors::CorsOptions::default();
+    let cors = cors_options.to_cors().expect("Cors");
+
+    rocket::ignite()
+        .mount("/", routes_with_openapi![get_messages, create_message])
+        .register(catchers![not_found, unprocessable_entity, server_error])
+        .attach(db::RocketConn::fairing())
+        .attach(cors)
+}

@@ -14,19 +14,6 @@ mod model;
 mod test;
 mod web;
 
-fn rocket() -> rocket::Rocket {
-    let cors_options: rocket_cors::CorsOptions = rocket_cors::CorsOptions::default();
-    let cors = cors_options.to_cors().expect("Cors");
-
-    rocket::ignite()
-        .mount(
-            "/",
-            routes_with_openapi![web::get_messages, web::create_message],
-        )
-        .attach(db::RocketConn::fairing())
-        .attach(cors)
-}
-
 fn main() {
-    rocket().launch();
+    web::rocket().launch();
 }
